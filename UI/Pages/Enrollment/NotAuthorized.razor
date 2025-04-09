@@ -1,0 +1,32 @@
+﻿@page "/NotAuthorized"
+
+<div class="card">
+    <div class="card-body">
+        <PageMessage Title="Error" Message="You don't have permission to access this page so go back to login page" Icon="fas fa-times-circle text-danger"></PageMessage>
+    </div>
+</div>
+
+<style>
+    .card {
+        margin: 50px auto;
+        max-width: 500px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        background-color: #fff;
+    }
+
+    .card-body {
+        padding: 20px;
+        text-align: center;
+    }
+
+    .card-body .fas {
+        font-size: 2rem;
+        margin-bottom: 10px;
+    }
+
+    .card-body .text-danger {
+        color: #dc3545;
+    }
+</style>

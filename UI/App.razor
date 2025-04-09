@@ -1,0 +1,27 @@
+﻿@using Microsoft.AspNetCore.Routing
+
+<CascadingAuthenticationState>
+    <CascadingBlazoredModal>
+        <Router AppAssembly="@typeof(App).Assembly">
+            <Found Context="routeData">
+                <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                    <NotAuthorized>
+                        <div class="card">
+                            <div class="card-body">
+                                <PageMessage Title="Error" Message="You don't have permission to this page" Icon="fas fa-times-circle text-danger"></PageMessage>
+                            </div>
+                        </div>
+                    </NotAuthorized>
+                </AuthorizeRouteView>
+                @* <FocusOnNavigate RouteData="@routeData" Selector="h1" /> *@
+            </Found>
+            <NotFound>
+                <PageTitle>Not found</PageTitle>
+                <LayoutView Layout="@typeof(MainLayout)">
+                    <p role="alert">Sorry, there's nothing at this address.</p>
+                </LayoutView>
+            </NotFound>
+        </Router>
+    </CascadingBlazoredModal>
+</CascadingAuthenticationState>
+

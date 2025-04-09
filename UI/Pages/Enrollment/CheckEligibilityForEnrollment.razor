@@ -1,0 +1,208 @@
+﻿@page "/CheckEligibilityForEnrollment"
+@attribute [Authorize]
+@inject IJSRuntime js
+@inject NavigationManager NavigationManager
+@inject EnrollmentConsumer EnrollmentConsumer
+@inject ReserverTokenAuthenticationStateProvider TokenProvider
+@inject HttpClient HttpClient
+@using System.Text.Json
+@using UI.Helpers
+@using System.Security.Claims
+
+<div class="app-bar">
+    <div class="app-bar-content">
+        <div class="app-bar-title">
+            <h1>Online Registration</h1>
+            <h3>AASTMT Students</h3>
+        </div>
+    </div>
+</div>
+
+<div class="student-data-section">
+    <h3>For The First Semester 2023/2024</h3>
+    <table class="student-data-table">
+        <tr>
+            <td>Registration Number:</td>
+            <td><div class="data-display">@student?.Reg_no</div></td>
+            <td>Name:</td>
+            <td><div class="data-display">@student?.S_Name</div></td>
+            <td>College:</td>
+            <td><div class="data-display">@student?.College</div></td>
+        </tr>
+        <tr>
+            <td>Department:</td>
+            <td><div class="data-display">@student?.D_name</div></td>
+            <td>Term Name:</td>
+            <td><div class="data-display">@student?.TermName</div></td>
+            <td>Study:</td>
+            <td><div class="data-display">@student?.GraduationPlanName</div></td>
+        </tr>
+        <tr>
+            <td>Total Achievement:</td>
+            <td><div class="data-display">@student?.TotalCreditAchievement</div></td>
+            <td>GPA:</td>
+            <td><div class="data-display">@student?.GPA</div></td>
+            <td>Semester:</td>
+            <td><div class="data-display">@student?.Semester</div></td>
+        </tr>
+    </table>
+    <button class="btn btn-primary" @onclick="CheckEligibility">Online Registration</button>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger" style="margin-top: 20px;">@errorMessage</div>
+}
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f8f9fa;
+        margin: 0;
+        padding: 0;
+    }
+
+    .app-bar {
+        background-color: #ffffff;
+        color: #000000;
+        padding: 10px 20px;
+        display: flex;
+        align-items: center;
+        border: 2px solid #000000;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .app-bar-title h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        color: #000000;
+    }
+
+    .app-bar-title h3 {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: normal;
+        color: #555555;
+    }
+
+    .student-data-section {
+        background-color: #fff;
+        padding: 20px;
+        margin: 20px auto;
+        max-width: 1000px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+        .student-data-section h3 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #343a40;
+        }
+
+    .student-data-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+        .student-data-table td {
+            padding: 10px;
+            vertical-align: middle;
+        }
+
+            .student-data-table td:first-child {
+                font-weight: bold;
+                color: #343a40;
+                width: 16.66%;
+            }
+
+    .data-display {
+        display: block;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background-color: #e9ecef;
+        color: #495057;
+        font-size: 0.9rem;
+        text-align: left;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1rem;
+    }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+</style>
+
+@code {
+    private StudentViewModel? student;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var token = await TokenProvider.GetTokenAsync(validate: true);
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/NotAuthorized", true);
+                return;
+            }
+
+            HttpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            var response = await EnrollmentConsumer.GetStudentDetails();
+            if (response.HasErrors || response.Data == null)
+            {
+                NavigationManager.NavigateTo("/NotAuthorized", true);
+                return;
+            }
+
+            student = response.Data;
+        }
+        catch (Exception ex)
+        {
+            NavigationManager.NavigateTo("/NotAuthorized", true);
+        }
+    }
+
+    private async Task CheckEligibility()
+    {
+        try
+        {
+            var token = await TokenProvider.GetTokenAsync(validate: true);
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/NotAuthorized", true);
+                return;
+            }
+
+            var response = await EnrollmentConsumer.CheckEligibilityForEnrollment();
+
+            if (response.HasErrors)
+            {
+                errorMessage = response.GetErrorsForHtml();
+            }
+            else if (!response.Data)
+            {
+                errorMessage = "You are not eligible for enrollment.";
+            }
+            else
+            {
+                NavigationManager.NavigateTo("/RegisteredCourses");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred during eligibility check: {ex.Message}";
+        }
+    }
+}

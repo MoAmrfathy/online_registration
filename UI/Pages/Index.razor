@@ -1,0 +1,85 @@
+﻿@page "/"
+@inject EnrollmentConsumer EnrollmentConsumer
+@inject NavigationManager NavigationManager
+@inject IJSRuntime js
+@inject ReserverTokenAuthenticationStateProvider TokenProvider
+@using System.Text.Json
+@using UI.Helpers
+
+<div class="container">
+    <div class="text-center mt-5">
+        <h1 class="text-primary font-weight-bold">AAST Registration Portal</h1>
+        <p class="text-secondary">Login to access your courses and registration details</p>
+    </div>
+
+    <div class="card login-card shadow-lg p-4 mt-4" style="max-width: 500px; margin: auto;">
+        <h4 class="text-center mb-4 text-dark">System Login</h4>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger text-center">
+                @errorMessage
+            </div>
+        }
+
+        <form>
+            <div class="form-group">
+                <label for="regNo" class="font-weight-bold">Registration Number</label>
+                <input type="text" id="regNo" class="form-control" @bind="regNo" placeholder="Enter Registration Number"
+                       required pattern="[0-9]*" title="Please enter a valid registration number" />
+            </div>
+
+            <div class="form-group">
+                <label for="pin" class="font-weight-bold">PIN</label>
+                <input type="password" id="pin" class="form-control" @bind="pin" placeholder="Enter PIN" required />
+            </div>
+
+            <button type="button" class="btn btn-primary btn-block font-weight-bold mt-3" @onclick="PerformLogin">Login</button>
+        </form>
+
+
+    </div>
+</div>
+
+@code {
+    private string regNo = "";
+    private string pin = "";
+    private string? errorMessage;
+
+    private async Task PerformLogin()
+    {
+        if (!long.TryParse(regNo, out var parsedRegNo))
+        {
+            errorMessage = "Invalid registration number format.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(pin))
+        {
+            errorMessage = "PIN cannot be empty.";
+            return;
+        }
+
+        try
+        {
+            var result = await EnrollmentConsumer.LoginByRegNoAndPin(parsedRegNo, long.Parse(pin));
+
+            if (result != null && !result.HasErrors && result.Data != null)
+            {
+                await TokenProvider.SetTokenAsync(result.Data.Token);
+                await js.InvokeVoidAsync("sessionStorage.setItem", "authToken", result.Data.Token);
+
+                NavigationManager.NavigateTo("/CheckEligibilityForEnrollment");
+            }
+            else
+            {
+                errorMessage = result?.GetErrorsForHtml() ?? "Invalid credentials.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred: {ex.Message}";
+        }
+    }
+}
+

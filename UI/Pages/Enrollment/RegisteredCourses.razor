@@ -1,0 +1,634 @@
+﻿@page "/RegisteredCourses"
+@inject IJSRuntime js
+@inject UI.DataConsumers.EnrollmentConsumer EnrollmentConsumer
+@inject ReserverTokenAuthenticationStateProvider TokenProvider
+@using UI.Helpers
+@inject NavigationManager NavigationManager
+@using System.Text.Json
+@inject HttpClient HttpClient
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+
+<AuthorizeView>
+    <Authorized>
+        <div class="app-bar">
+            <div class="app-bar-content">
+                <div class="app-bar-title">
+                    <h1>Online Registration</h1>
+                    <h3>AASTMT Students</h3>
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="card">
+                <div class="card-body">
+                    <i class="fas fa-check-circle text-success"></i>
+                    <p>@successMessage</p>
+                </div>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="card">
+                <div class="card-body">
+                    <i class="fas fa-exclamation-circle text-danger"></i>
+                    <p>@errorMessage</p>
+                </div>
+            </div>
+        }
+
+        <div class="student-data-section">
+            <h3>Student Information</h3>
+            <table class="student-data-table">
+                <tr>
+                    <td>Registration Number:</td>
+                    <td><div class="data-display">@student?.Reg_no</div></td>
+                    <td>Name:</td>
+                    <td><div class="data-display">@student?.S_Name</div></td>
+                </tr>
+                <tr>
+                    <td>College:</td>
+                    <td><div class="data-display">@student?.College</div></td>
+                    <td>Department:</td>
+                    <td><div class="data-display">@student?.D_name</div></td>
+                </tr>
+                <tr>
+                    <td>Term Name:</td>
+                    <td><div class="data-display">@student?.TermName</div></td>
+                    <td>Study:</td>
+                    <td><div class="data-display">@student?.GraduationPlanName</div></td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="course-selection-section">
+            <h3>Select Course and Group</h3>
+            <div>
+                <label for="courseDropdown">Course:</label>
+                <select id="courseDropdown" @onchange="OnCourseSelected">
+                    <option value="">--Select a Course--</option>
+                    @foreach (var course in courses)
+                    {
+                        <option value="@course.C_id">@course.C_Title</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label for="groupDropdown">Group:</label>
+                <select id="groupDropdown" @onchange="OnGroupSelected" disabled="@(groups == null || !groups.Any())">
+                    <option value="">--Select a Group--</option>
+                    @foreach (var group in groups)
+                    {
+                        <option value="@group.GroupId">@group.GroupName</option>
+                    }
+                </select>
+            </div>
+
+            <button class="btn btn-primary" @onclick="AddCourseToSelection">Add</button>
+        </div>
+
+        <div class="course-details-section">
+            <h3>Selected Courses</h3>
+            <table class="course-details-table">
+                <thead>
+                    <tr>
+                        <th>Course Name</th>
+                        <th>Course Code</th>
+                        <th>Group Name</th>
+                        <th>Capacity</th>
+                        <th>Actions</th>
+                        <th>Group</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (selectedCoursesDetails != null && selectedCoursesDetails.Any())
+                    {
+                        @foreach (var courseDetail in selectedCoursesDetails)
+                        {
+                            <tr>
+                                <td>@courseDetail.CourseName</td>
+                                <td>@courseDetail.CourseCode</td>
+                                <td>@courseDetail.GroupName</td>
+                                <td>@courseDetail.Capacity</td>
+                                <td>
+                                    <button class="btn btn-danger" @onclick="() => RemoveCourse(courseDetail.SelectedCourseId)">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center">No courses selected.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="timetable-section">
+            <h3>Weekly Schedule</h3>
+            <table class="timetable-table">
+                <thead>
+                    <tr>
+                        <th>Time/Day</th>
+                        @foreach (var day in weekDays)
+                        {
+                            <th>@day</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var hourSlot in hourSlots)
+                    {
+                        <tr>
+                            <td>@hourSlot</td>
+                            @foreach (var day in weekDays)
+                            {
+                                <td>
+                                    @foreach (var course in selectedCoursesDetails)
+                                    {
+                                        var normalizedLectureTime = course.LectureTime?.Replace(":00", "");
+                                        var normalizedSectionTime = course.SectionTime?.Replace(":00", "");
+
+                                        if (normalizedLectureTime.StartsWith(day) && normalizedLectureTime.Contains(hourSlot))
+                                        {
+                                            <div class="lecture-block">
+                                                <div><strong>Lecture: @course.LectureName</strong></div>
+                                                <div>@course.CourseName (@course.CourseCode)</div>
+                                                <div>@course.LectureTime</div>
+                                            </div>
+                                        }
+
+                                        if (normalizedSectionTime.StartsWith(day) && normalizedSectionTime.Contains(hourSlot))
+                                        {
+                                            <div class="section-block">
+                                                <div><strong>Section: @course.SectionName</strong></div>
+                                                <div>@course.CourseName (@course.CourseCode)</div>
+                                                <div>@course.SectionTime</div>
+                                            </div>
+                                        }
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="confirm-registration-section">
+            <button class="btn btn-success" @onclick="ConfirmRegistration">Confirm Registration</button>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <div class="card">
+            <div class="card-body">
+                <i class="fas fa-times-circle text-danger"></i>
+                <p>You don't have permission to access this page</p>
+            </div>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+
+
+<style>
+    body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f9fa;
+    margin: 0;
+    padding: 0;
+    }
+
+    .app-bar {
+    background-color: #ffffff;
+    color: #000000;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    border: 2px solid #000000;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .app-bar-title h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #000000;
+    }
+
+    .app-bar-title h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: normal;
+    color: #555555;
+    }
+
+    .student-data-section {
+    background-color: #fff;
+    padding: 20px;
+    margin: 20px auto;
+    max-width: 1000px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .student-data-section h3 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #343a40;
+    }
+
+    .student-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    }
+
+    .student-data-table td {
+    padding: 10px;
+    vertical-align: middle;
+    }
+
+    .student-data-table td:first-child {
+    font-weight: bold;
+    color: #343a40;
+    width: 16.66%;
+    }
+
+    .data-display {
+    display: block;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #e9ecef;
+    color: #495057;
+    font-size: 0.9rem;
+    text-align: left;
+    }
+
+    .btn {
+    padding: 8px 16px;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease;
+    }
+
+    .btn:hover {
+    background-color: #0056b3;
+    }
+
+    .btn-danger {
+    background-color: #e74c3c;
+    color: white;
+    }
+
+    .btn-danger:hover {
+    background-color: #c0392b;
+    }
+
+    .btn-success {
+    background-color: #2ecc71;
+    color: white;
+    }
+
+    .btn-success:hover {
+    background-color: #27ae60;
+    }
+
+    .course-selection-section,
+    .course-details-section,
+    .timetable-section,
+    .confirm-registration-section {
+    margin: 20px auto;
+    max-width: 800px;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .course-details-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 16px;
+    background-color: #f9f9f9;
+    }
+
+    .course-details-table th,
+    .course-details-table td {
+    border: 1px solid #ddd;
+    padding: 12px;
+    text-align: center;
+    }
+
+    .course-details-table th {
+    background-color: #4CAF50;
+    color: white;
+    font-weight: bold;
+    }
+
+    .course-details-table tr:nth-child(even) {
+    background-color: #f2f2f2;
+    }
+
+    .course-details-table tr:hover {
+    background-color: #f1f1f1;
+    transition: background-color 0.3s ease-in-out;
+    }
+
+    .timetable-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    }
+
+    .timetable-table th,
+    .timetable-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+    vertical-align: top;
+    }
+
+    .timetable-table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+    }
+
+    .lecture-block {
+    background-color: #e6ffe6;
+    margin: 5px 0;
+    padding: 5px;
+    border: 1px solid #66cc66;
+    border-radius: 5px;
+    }
+
+    .section-block {
+    background-color: #ffe6e6;
+    margin: 5px 0;
+    padding: 5px;
+    border: 1px solid #cc6666;
+    border-radius: 5px;
+    }
+
+    .card {
+    margin: 50px auto;
+    max-width: 500px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background-color: #fff;
+    }
+
+    .card-body {
+    padding: 20px;
+    text-align: center;
+    }
+
+    .card-body .fas {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    }
+
+    .card-body .text-danger {
+    color: #dc3545;
+    }
+
+    .card-body .text-success {
+    color: #28a745;
+    }
+
+</style>
+
+
+
+
+
+@code {
+    private StudentViewModel? student;
+    private string? successMessage;
+    private string? errorMessage;
+    private bool hasTimeConflict = true;
+
+    private List<CourseViewModel> courses = new List<CourseViewModel>();
+    private List<GroupDetailsViewModel> groups = new List<GroupDetailsViewModel>();
+    private List<GroupDetailsViewModel> selectedCoursesDetails = new List<GroupDetailsViewModel>();
+    private List<CourseGroupPair> selectedCourses = new List<CourseGroupPair>();
+    private int selectedCourseId;
+    private int selectedGroupId;
+
+    private readonly List<string> weekDays = new() { "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday" };
+    private readonly List<string> hourSlots = new()
+    {
+        "08:30 - 10:20",
+        "10:30 - 12:20",
+        "12:30 - 14:20",
+        "14:30 - 16:20",
+        "16:30 - 18:20"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var token = await TokenProvider.GetTokenAsync(validate: true);
+            if (string.IsNullOrEmpty(token))
+            {
+                NavigationManager.NavigateTo("/NotAuthorized", true);
+                return;
+            }
+
+            HttpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            var response = await EnrollmentConsumer.GetStudentDetails();
+            if (response.HasErrors || response.Data == null)
+            {
+                errorMessage = "Failed to fetch student data. Please log in again.";
+                NavigationManager.NavigateTo("/NotAuthorized", true);
+                return;
+            }
+
+            student = response.Data;
+
+            await LoadCoursesBySemester();
+            await LoadSelectedCoursesDetails();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred during initialization: {ex.Message}";
+        }
+    }
+
+    private async Task LoadCoursesBySemester()
+    {
+        try
+        {
+            var response = await EnrollmentConsumer.ListCoursesByStudentSemester();
+            if (response.HasErrors)
+            {
+                errorMessage = response.GetErrorsForHtml();
+            }
+            else
+            {
+                courses = response.Data;
+                successMessage = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load courses: {ex.Message}";
+        }
+    }
+
+    private async Task LoadSelectedCoursesDetails()
+    {
+        try
+        {
+            var response = await EnrollmentConsumer.GetSelectedCoursesWithGroupDetails(selectedCourses);
+            if (response.HasErrors)
+            {
+                errorMessage = response.GetErrorsForHtml();
+            }
+            else
+            {
+                selectedCoursesDetails = response.Data;
+                successMessage = null;
+                hasTimeConflict = await CheckForTimeConflicts();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load selected courses: {ex.Message}";
+        }
+    }
+
+    private async Task<bool> CheckForTimeConflicts()
+    {
+        var response = await EnrollmentConsumer.CheckPrerequisitesAndConflicts(selectedCourses);
+        return response.HasErrors;
+    }
+
+    private async Task OnCourseSelected(ChangeEventArgs e)
+    {
+        try
+        {
+            if (int.TryParse(e.Value?.ToString(), out var courseId))
+            {
+                selectedCourseId = courseId;
+
+                var response = await EnrollmentConsumer.ListGroupsByCourseId(courseId);
+                if (response.HasErrors)
+                {
+                    errorMessage = response.GetErrorsForHtml();
+                }
+                else
+                {
+                    groups = response.Data;
+                    successMessage = null;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load groups: {ex.Message}";
+        }
+    }
+
+    private void OnGroupSelected(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var groupId))
+        {
+            selectedGroupId = groupId;
+        }
+    }
+
+    private async Task AddCourseToSelection()
+    {
+        try
+        {
+            if (selectedCourseId == 0 || selectedGroupId == 0)
+            {
+                return;
+            }
+
+            if (selectedCourses.Any(sc => sc.C_id == selectedCourseId && sc.GroupId == selectedGroupId))
+            {
+                return;
+            }
+
+            var courseGroupPair = new CourseGroupPair { C_id = selectedCourseId, GroupId = selectedGroupId };
+
+            var response = await EnrollmentConsumer.AddSelectedCourses(new List<CourseGroupPair> { courseGroupPair });
+            if (response.HasErrors || !response.Data)
+            {
+                errorMessage = response.GetErrorsForHtml() ?? "Failed to add selected course.";
+                return;
+            }
+
+            successMessage = response.SuccessMessage;
+            selectedCourses.Add(courseGroupPair);
+
+            await LoadSelectedCoursesDetails();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to add course: {ex.Message}";
+        }
+    }
+
+    private async Task ConfirmRegistration()
+    {
+        try
+        {
+
+            var response = await EnrollmentConsumer.AddEnrollment(selectedCourses);
+            if (response.HasErrors || !response.Data)
+            {
+                errorMessage = response.GetErrorsForHtml() ?? "Failed to confirm registration.";
+                return;
+            }
+
+            successMessage = response.SuccessMessage;
+            selectedCourses.Clear();
+            await LoadSelectedCoursesDetails();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred while confirming registration: {ex.Message}";
+        }
+    }
+
+    private async Task RemoveCourse(int selectedCourseId)
+    {
+        try
+        {
+            var response = await EnrollmentConsumer.RemoveCourseFromSelectedList(selectedCourseId);
+            if (response.HasErrors || !response.Data)
+            {
+                errorMessage = response.GetErrorsForHtml() ?? "Failed to remove the selected course.";
+                Console.WriteLine(selectedCourseId);
+            }
+
+            else
+            {
+                successMessage = response.SuccessMessage;
+                selectedCourses.RemoveAll(sc => sc.SelectedCourseId == selectedCourseId);
+                await LoadSelectedCoursesDetails();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to remove course: {ex.Message}";
+        }
+    }
+}

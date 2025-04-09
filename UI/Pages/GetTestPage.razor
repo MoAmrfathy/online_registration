@@ -1,0 +1,74 @@
+﻿@page "/ApiTest"
+@inject TempConsumer _tempConsumer
+@inject IJSRuntime js
+<PageTitle>ApiTest</PageTitle>
+
+@if (IsLoading)
+{
+    <div class="card">
+
+        <div class="card-body">
+            <PageMessage Title="Loading" Message="Please wait while loading page content." Icon="fas fa-sync-alt text-gold fa-spin"></PageMessage>
+        </div>
+    </div>
+}
+else
+{
+    if (model != null)
+    {
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="head  col-6">
+                        <h4>
+                            Api Test
+                        </h4>
+                    </div>
+                    <div class="col-md-6 col-12">
+                        <a href="/" class="btn btn-outline-info btn-sm float-right"><i class="fas fa-chevron-left"></i>Back</a>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="head  col-6">
+                        <h5>
+                            @model.TempField
+                        </h5>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <PageMessage Title="Error" Message="Failure loading this page" Icon="fas fa-times-circle text-danger"></PageMessage>
+    }
+}
+
+@code {
+    private bool IsLoading { get; set; } = true;
+    private TemplateViewModel model = new TemplateViewModel();
+    protected override async Task OnInitializedAsync()
+    {
+        await GetTest();
+        IsLoading = false;
+    }
+
+    private async Task GetTest()
+    {
+        var ret = await _tempConsumer.GetTest();
+        if (ret.HasErrors)
+        {
+            string errors = "";
+            foreach (var error in ret.Errors)
+            {
+                errors += (error.Message + ".  <br/>");
+            }
+            await js.DisplayMessage("Error", errors, SweetAlertMessageType.error);
+            model = null;
+            return;
+        }
+        model = ret.Data;
+    }
+}

@@ -1,0 +1,16 @@
+﻿<div class="PageMessage">
+    <div class="innerBox">
+        <i class="@Icon"></i>
+        <h1>@Title</h1>
+        <p>@Message</p>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; }
+    [Parameter]
+    public string Message { get; set; }
+    [Parameter]
+    public string Icon { get; set; }
+}
