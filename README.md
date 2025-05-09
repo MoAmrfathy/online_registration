@@ -44,8 +44,7 @@ The **Online Registration System** is a web-based application that allows studen
 - ✅ Student registration and course enrollment functionality  
 - ✅ Admin management for course creation and updates  
 - ✅ Enrollment history tracking  
-- ✅ Real-time validation of available seats during enrollment  
-- ✅ Layered architecture for clean separation of logic
+- ✅ Real-time validation of available seats during enrollment
 
 ## Installation
 
